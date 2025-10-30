@@ -1,0 +1,16 @@
+{
+  "name": "Tic Tac Toe",
+  "short_name": "TicTacToe",
+  "description": "Blockchain Tic Tac Toe Game on Stacks",
+  "icons": [
+    {
+      "src": "https://cryptologos.cc/logos/stacks-stx-logo.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    }
+  ],
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#5546FF",
+  "background_color": "#ffffff"
+}
