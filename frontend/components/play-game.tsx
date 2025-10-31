@@ -4,7 +4,7 @@ import { Game, Move } from "@/lib/contract";
 import { GameBoard } from "./game-board";
 import { abbreviateAddress, explorerAddress, formatStx } from "@/lib/stx-utils";
 import Link from "next/link";
-import { useStacks } from "@/hooks/use-stacks";
+import { useStacks, getUserAddress } from "@/hooks/use-stacks";
 import { useState } from "react";
 
 interface PlayGameProps {
@@ -16,6 +16,8 @@ export function PlayGame({ game }: PlayGameProps) {
 
   // Initial game board is the current `game.board` state
   const [board, setBoard] = useState(game.board);
+  const [isJoining, setIsJoining] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
 
   // cell where user played their move. -1 denotes no move has been played
   const [playedMoveIndex, setPlayedMoveIndex] = useState(-1);
@@ -23,10 +25,11 @@ export function PlayGame({ game }: PlayGameProps) {
   // If user is not logged in, don't show anything
   if (!userData) return null;
 
-  const isPlayerOne =
-    userData.profile.stxAddress.testnet === game["player-one"];
-  const isPlayerTwo =
-    userData.profile.stxAddress.testnet === game["player-two"];
+  const userAddress = getUserAddress(userData);
+  if (!userAddress) return null;
+
+  const isPlayerOne = userAddress === game["player-one"];
+  const isPlayerTwo = userAddress === game["player-two"];
 
   const isJoinable = game["player-two"] === null && !isPlayerOne;
   const isJoinedAlready = isPlayerOne || isPlayerTwo;
@@ -100,19 +103,33 @@ export function PlayGame({ game }: PlayGameProps) {
 
       {isJoinable && (
         <button
-          onClick={() => handleJoinGame(game.id, playedMoveIndex, nextMove)}
-          className="bg-blue-500 text-white px-4 py-2 rounded"
+          onClick={async () => {
+            setIsJoining(true);
+            await handleJoinGame(game.id, playedMoveIndex, nextMove);
+            // Wait for transaction to be broadcast
+            await new Promise((resolve) => setTimeout(resolve, 3000));
+            window.location.reload();
+          }}
+          disabled={isJoining || playedMoveIndex === -1}
+          className="bg-blue-500 text-white px-4 py-2 rounded disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          Join Game
+          {isJoining ? "Joining Game..." : "Join Game"}
         </button>
       )}
 
       {isMyTurn && (
         <button
-          onClick={() => handlePlayGame(game.id, playedMoveIndex, nextMove)}
-          className="bg-blue-500 text-white px-4 py-2 rounded"
+          onClick={async () => {
+            setIsPlaying(true);
+            await handlePlayGame(game.id, playedMoveIndex, nextMove);
+            // Wait for transaction to be broadcast
+            await new Promise((resolve) => setTimeout(resolve, 3000));
+            window.location.reload();
+          }}
+          disabled={isPlaying || playedMoveIndex === -1}
+          className="bg-blue-500 text-white px-4 py-2 rounded disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          Play
+          {isPlaying ? "Playing..." : "Play"}
         </button>
       )}
 

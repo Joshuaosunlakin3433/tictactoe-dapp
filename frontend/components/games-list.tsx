@@ -1,6 +1,6 @@
 "use client";
 
-import { useStacks } from "@/hooks/use-stacks";
+import { useStacks, getUserAddress } from "@/hooks/use-stacks";
 import { Game } from "@/lib/contract";
 import Link from "next/link";
 import { useMemo } from "react";
@@ -14,13 +14,17 @@ export function GamesList({ games }: { games: Game[] }) {
 
   const userGames = useMemo(() => {
     if (!userData) return [];
-    const userAddress = userData.profile.stxAddress.testnet;
+    const userAddress = getUserAddress(userData);
+    if (!userAddress) return [];
+
     const filterAddress = games.filter(
       (game) =>
         (game["player-one"] === userAddress ||
           game["player-two"] === userAddress) &&
         game.winner === null
     );
+    console.log("👤 Your address:", userAddress);
+    console.log("🎮 Your active games:", filterAddress);
     return filterAddress;
   }, [userData, games]);
   // Joinable games are games in which there still isn't a second player
@@ -28,7 +32,8 @@ export function GamesList({ games }: { games: Game[] }) {
 
   const joinableGames = useMemo(() => {
     if (!userData) return [];
-    const userAddress = userData.profile.stxAddress.testnet;
+    const userAddress = getUserAddress(userData);
+    if (!userAddress) return [];
 
     return games.filter(
       (game) =>
@@ -44,9 +49,30 @@ export function GamesList({ games }: { games: Game[] }) {
   }, [games]);
   return (
     <div className="w-full max-w-4xl space-y-12">
+      <div className="text-center mb-4">
+        <button
+          onClick={() => window.location.reload()}
+          className="text-sm text-blue-500 hover:text-blue-400 underline"
+        >
+          🔄 Refresh Games
+        </button>
+        <p className="text-xs text-gray-500 mt-1">
+          Total games on blockchain: {games.length}
+        </p>
+        <p className="text-xs text-yellow-600 mt-1">
+          ⏱️ New games may take 30-60 seconds to appear after transaction
+          confirmation
+        </p>
+      </div>
+
       {userData ? (
         <div>
-          <h2 className="text-2xl font-bold mb-4">Active Games</h2>
+          <h2 className="text-2xl font-bold mb-4">
+            Active Games ({userGames.length})
+          </h2>
+          <p className="text-sm text-gray-400 mb-4">
+            Games you created or joined
+          </p>
           {userGames.length === 0 ? (
             <div className="text-center py-12 border rounded-lg">
               <p className="text-gray-500 mb-4">
@@ -86,7 +112,12 @@ export function GamesList({ games }: { games: Game[] }) {
       ) : null}
 
       <div>
-        <h2 className="text-2xl font-bold mb-4">Joinable Games</h2>
+        <h2 className="text-2xl font-bold mb-4">
+          Joinable Games ({joinableGames.length})
+        </h2>
+        <p className="text-sm text-gray-400 mb-4">
+          Games created by other players waiting for opponents
+        </p>
         {joinableGames.length === 0 ? (
           <div className="text-center py-12 border rounded-lg">
             <p className="text-gray-500 mb-4">

@@ -5,6 +5,7 @@ import {
   fetchCallReadOnlyFunction,
   ListCV,
   OptionalCV,
+  PostConditionMode,
   PrincipalCV,
   TupleCV,
   uintCV,
@@ -52,26 +53,38 @@ export const EMPTY_BOARD = [
 ];
 
 export async function getAllGames() {
-  //fetch the latest-game-id from the contract
-  const latestGameIdCV = (await fetchCallReadOnlyFunction({
-    contractAddress: CONTRACT_ADDRESS,
-    contractName: CONTRACT_NAME,
-    functionName: "get-latest-game-id",
-    functionArgs: [],
-    senderAddress: CONTRACT_ADDRESS,
-    network: STACKS_TESTNET,
-  })) as UIntCV;
+  try {
+    //fetch the latest-game-id from the contract
+    const latestGameIdCV = (await fetchCallReadOnlyFunction({
+      contractAddress: CONTRACT_ADDRESS,
+      contractName: CONTRACT_NAME,
+      functionName: "get-latest-game-id",
+      functionArgs: [],
+      senderAddress: CONTRACT_ADDRESS,
+      network: STACKS_TESTNET,
+    })) as UIntCV;
 
-  //convert the UintCV to a JS/TS number type
-  const latestGameId = parseInt(latestGameIdCV.value.toString());
+    //convert the UintCV to a JS/TS number type
+    const latestGameId = parseInt(latestGameIdCV.value.toString());
+    console.log("📊 Latest game ID from contract:", latestGameId);
 
-  // loop from 0 to latestGameId-1 and fetch the game details for each game
-  const games: Game[] = [];
-  for (let i = 0; i < latestGameId; i++) {
-    const game = await getGame(i);
-    if (game) games.push(game);
+    // loop from 0 to latestGameId-1 and fetch the game details for each game
+    const games: Game[] = [];
+    for (let i = 0; i < latestGameId; i++) {
+      const game = await getGame(i);
+      if (game) games.push(game);
+    }
+    console.log("🎮 Total games fetched:", games.length, games);
+    return games;
+  } catch (error) {
+    console.error("❌ ERROR fetching games:", error);
+    console.error("Contract address:", CONTRACT_ADDRESS);
+    console.error("Contract name:", CONTRACT_NAME);
+    console.error(
+      "This usually means the contract is not deployed at this address!"
+    );
+    return [];
   }
-  return games;
 }
 
 export async function getGame(gameId: number) {
@@ -111,35 +124,53 @@ export async function getGame(gameId: number) {
 export async function createNewGame(
   betAmount: number,
   moveIndex: number,
-  move: Move
+  move: Move,
+  senderAddress: string
 ) {
+  // Use "allow" mode to permit STX transfers without explicit post-conditions
   // Return format for @stacks/connect v8 request("stx_callContract", ...)
   const txOptions = {
-    contract: `${CONTRACT_ADDRESS}.${CONTRACT_NAME}` as `${string}.${string}`, // v8 uses "address.name" format
+    contract: `${CONTRACT_ADDRESS}.${CONTRACT_NAME}` as `${string}.${string}`,
     functionName: "create-game",
     functionArgs: [uintCV(betAmount), uintCV(moveIndex), uintCV(move)],
+    postConditionMode: "allow" as const,
   };
+
+  console.log("📝 Transaction options:", {
+    contract: txOptions.contract,
+    functionName: txOptions.functionName,
+    betAmount: betAmount,
+    moveIndex: moveIndex,
+    move: move,
+    senderAddress: senderAddress,
+    postCondition: "STX transfer approved",
+    args: txOptions.functionArgs.map((arg, i) => ({
+      index: i,
+      type: arg.type,
+      value: arg.value.toString(),
+    })),
+  });
 
   return txOptions;
 }
 
 export async function joinGame(gameId: number, moveIndex: number, move: Move) {
-  // Return format for @stacks/connect v8 request("stx_callContract", ...)
   const txOptions = {
     contract: `${CONTRACT_ADDRESS}.${CONTRACT_NAME}` as `${string}.${string}`,
     functionName: "join-game",
     functionArgs: [uintCV(gameId), uintCV(moveIndex), uintCV(move)],
+    postConditionMode: "allow" as const,
   };
 
   return txOptions;
 }
 
 export async function play(gameId: number, moveIndex: number, move: Move) {
-  // Return format for @stacks/connect v8 request("stx_callContract", ...)
   const txOptions = {
     contract: `${CONTRACT_ADDRESS}.${CONTRACT_NAME}` as `${string}.${string}`,
     functionName: "play",
     functionArgs: [uintCV(gameId), uintCV(moveIndex), uintCV(move)],
+    postConditionMode: "allow" as const,
   };
 
   return txOptions;

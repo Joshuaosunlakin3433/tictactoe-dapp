@@ -11,6 +11,41 @@ import {
 } from "@stacks/connect";
 import { useEffect, useState } from "react";
 
+// Helper to get user's STX address from userData
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function getUserAddress(
+  userData: any,
+  network: "testnet" | "mainnet" = "testnet"
+): string | null {
+  if (!userData) return null;
+
+  // New v8 API structure - addresses array contains network-specific addresses
+  if (userData.addresses?.stx) {
+    // Find the address for the requested network
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const addressEntry = userData.addresses.stx.find((entry: any) =>
+      entry.address?.startsWith(network === "mainnet" ? "SP" : "ST")
+    );
+    if (addressEntry?.address) {
+      return addressEntry.address;
+    }
+    // Fallback to first address if no network match
+    if (userData.addresses.stx[0]?.address) {
+      return userData.addresses.stx[0].address;
+    }
+  }
+
+  // Fallback for old v7 structure (if any)
+  if (userData.profile?.stxAddress) {
+    return (
+      userData.profile.stxAddress[network] ||
+      userData.profile.stxAddress.testnet
+    );
+  }
+
+  return null;
+}
+
 export function useStacks() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [userData, setUserData] = useState<any | null>(null);
@@ -73,16 +108,37 @@ export function useStacks() {
     }
     try {
       if (!userData) throw new Error("User not connected");
-      const txOptions = await createNewGame(betAmount, moveIndex, move);
+
+      const userAddress = getUserAddress(userData);
+      if (!userAddress) throw new Error("Could not get user address");
+
+      const txOptions = await createNewGame(
+        betAmount,
+        moveIndex,
+        move,
+        userAddress
+      );
+
+      console.log("🚀 Sending transaction with options:", txOptions);
 
       // Use the new v8 API: request("stx_callContract", options)
       const response = await request("stx_callContract", txOptions);
-      console.log("Transaction response:", response);
-      window.alert(`Sent create game transaction! TX ID: ${response.txid}`);
+      console.log("✅ Transaction response:", response);
+
+      if (response.txid) {
+        const explorerUrl = `https://explorer.hiro.so/txid/0x${response.txid}?chain=testnet`;
+        window.alert(
+          `✅ Game creation transaction sent!\n\nTX ID: ${response.txid}\n\n⏱️ Wait 1-2 minutes for blockchain confirmation.\n\n📊 Check status: ${explorerUrl}\n\nThe game will appear once the transaction is confirmed.`
+        );
+        return response.txid;
+      } else {
+        throw new Error("No transaction ID received");
+      }
     } catch (_err) {
       const err = _err as Error;
-      console.error(err);
-      window.alert(err.message);
+      console.error("❌ Transaction error:", err);
+      window.alert(`❌ Failed to create game:\n\n${err.message}`);
+      throw err;
     }
   }
 
@@ -99,12 +155,25 @@ export function useStacks() {
 
       // Use the new v8 API: request("stx_callContract", options)
       const response = await request("stx_callContract", txOptions);
-      console.log("Transaction response:", response);
-      window.alert(`Sent join game transaction! TX ID: ${response.txid}`);
+      console.log("✅ Join game transaction response:", response);
+
+      if (response.txid) {
+        const explorerUrl = `https://explorer.hiro.so/txid/0x${response.txid}?chain=testnet`;
+
+        // Open explorer in new tab
+        window.open(explorerUrl, "_blank");
+
+        window.alert(
+          `✅ Join game transaction sent!\n\nTX ID: ${response.txid}\n\n⏱️ Wait 1-2 minutes for confirmation.\n\n📊 Explorer opened in new tab!`
+        );
+        return response.txid;
+      } else {
+        throw new Error("No transaction ID received");
+      }
     } catch (_err) {
       const err = _err as Error;
-      console.error(err);
-      window.alert(err.message);
+      console.error("❌ Join game error:", err);
+      window.alert(`❌ Failed to join game:\n\n${err.message}`);
     }
   }
 
@@ -120,12 +189,25 @@ export function useStacks() {
 
       // Use the new v8 API: request("stx_callContract", options)
       const response = await request("stx_callContract", txOptions);
-      console.log("Transaction response:", response);
-      window.alert(`Sent play game transaction! TX ID: ${response.txid}`);
+      console.log("✅ Play game transaction response:", response);
+
+      if (response.txid) {
+        const explorerUrl = `https://explorer.hiro.so/txid/0x${response.txid}?chain=testnet`;
+
+        // Open explorer in new tab
+        window.open(explorerUrl, "_blank");
+
+        window.alert(
+          `✅ Move transaction sent!\n\nTX ID: ${response.txid}\n\n⏱️ Wait 1-2 minutes for confirmation.\n\n📊 Explorer opened in new tab!`
+        );
+        return response.txid;
+      } else {
+        throw new Error("No transaction ID received");
+      }
     } catch (_err) {
       const err = _err as Error;
-      console.error(err);
-      window.alert(err.message);
+      console.error("❌ Play game error:", err);
+      window.alert(`❌ Failed to make move:\n\n${err.message}`);
     }
   }
 
@@ -144,10 +226,8 @@ export function useStacks() {
   }, []);
 
   useEffect(() => {
-    if (userData && userData.profile) {
-      // Access the STX address from the profile
-      // The profile contains addresses for different networks
-      const address = userData.profile.stxAddress?.testnet;
+    if (userData) {
+      const address = getUserAddress(userData);
       if (address) {
         getStxBalance(address).then((balance) => {
           setStxBalance(balance);
